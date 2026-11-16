@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Environment variables
+.env
+
+# Generated data and results
+data/*
+!data/.gitkeep
+results/*
+!results/.gitkeep
+
+# Model weights (large, downloaded separately)
+weights/
+
+# Temporary files
+*.tmp
+*.log
+
+# Archived files
+_archive

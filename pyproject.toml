@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microtrack"
+version = "0.2.0"
+description = "Анализ микроорганизмов: сегментация, трекинг, морфометрия"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "scipy",
+    "pandas",
+    "PyYAML",
+    "scikit-image",
+    "tifffile",
+    "psutil",
+]
+
+[project.optional-dependencies]
+parquet = ["pyarrow"]
+models = ["torch", "cellpose", "omnipose", "tensorflow", "stardist"]
+dev = ["pytest", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

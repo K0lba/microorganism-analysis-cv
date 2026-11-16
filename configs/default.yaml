@@ -1,0 +1,159 @@
+project:
+  name: microorganism-analysis
+  random_seed: 42
+
+input:
+  supported_images:
+    - png
+    - jpg
+    - jpeg
+    - bmp
+    - tif
+    - tiff
+  supported_videos:
+    - mp4
+    - avi
+    - mov
+    - mkv
+
+  # 1 = обрабатывать каждый кадр, 5 = каждый пятый кадр.
+  # Время кадра при этом остаётся исходным (io.iter_frames(step=frame_stride)).
+  frame_stride: 1
+
+  # Источник времени: исходные временные отметки видео,
+  # если доступны; иначе index / fps (io.iter_frames(timestamp_source=...)).
+  timestamp_source: source_pts
+
+  # Частота кадров. Для видео null — взять из файла; для папки кадров или
+  # TIFF-стека без fps один кадр считается за 1 с. Явный fps важнее отметок видео.
+  fps: null
+
+  # Ограничить число обрабатываемых кадров (null — все). Удобно для пробного прогона.
+  max_frames: null
+
+# Идентификатор эксперимента и условия: попадают в каждую строку таблицы
+# (условия — столбцами cond_<имя>).
+experiment:
+  id: experiment
+  conditions: {}
+
+preprocessing:
+  enabled: true
+  grayscale: true
+
+  # Масштаб кадра (1.0 — без изменений). Калибровка пересчитывается автоматически.
+  scale: 1.0
+
+  # CLAHE — локальное улучшение контраста.
+  clahe:
+    enabled: false
+    clip_limit: 2.0
+    tile_grid_size: 8
+
+  denoise:
+    enabled: false
+    method: median            # median | gaussian | bilateral | nlm
+    kernel_size: 3            # для median
+    strength: 1.0             # для gaussian (sigma) / bilateral / nlm
+
+  # Резкость: unsharp mask, итоговый коэффициент = 1 + amount.
+  sharpen:
+    enabled: false
+    amount: 1.0
+
+segmentation:
+  # classical — порог и морфология (параметры ниже);
+  # или готовая модель, которая сама ищет объекты: cellpose_cpsam, cellpose_cyto3,
+  # omnipose_bact_phase, stardist_fluo, sam2_auto. Для модели из параметров ниже
+  # используется только min_object_area_px.
+  method: classical
+
+  # Пороговые значения в дальнейшем будут настраиваться
+  # под конкретные изображения.
+  threshold_method: otsu      # otsu | adaptive | fixed
+  threshold:
+    objects: auto             # dark | bright | auto (auto — объекты это меньшая часть кадра)
+    block_size: 51            # adaptive: окно (нечётное)
+    offset: 5.0               # adaptive: отличие от локального среднего
+    fixed_value: 128          # fixed
+
+  morphology:
+    enabled: true
+    kernel_size: 3            # для open и close; отдельно: open_ksize / close_ksize
+    kernel: ellipse           # ellipse | rect
+    fill_holes: true
+
+  min_object_area_px: 3
+  max_object_area_px: null
+
+  # Дополнительные фильтры компонент (null — выключено).
+  filters:
+    unit: px                  # px | um — единицы порогов min/max_length, min/max_width
+    min_length: null
+    max_length: null
+    min_width: null
+    max_width: null
+    min_circularity: null     # 4πA/P², 1 — круг
+    min_solidity: null
+    max_aspect_ratio: null
+    exclude_border: false
+
+  # Экспериментально: разделение слипшихся объектов.
+  split:
+    enabled: false
+    peak_fraction: 0.6
+    smooth_sigma: 1.0
+    min_component_area: 40
+
+# Ручная инициализация целевого объекта на первом кадре (scripts/init_target.py).
+initialization:
+  method: auto                # auto (с моделью — model, без — threshold) | threshold | grabcut | model
+  threshold:
+    method: otsu              # otsu | adaptive | fixed
+    objects: auto             # dark | bright | auto (для точки — по яркости под кликом, для рамки/ROI — по фону вокруг)
+    block_size: 51
+    offset: 5.0
+  morphology:
+    open_ksize: 3
+    close_ksize: 3
+    kernel: ellipse
+    fill_holes: true
+  smooth_sigma: 0.5           # сглаживание перед порогом, px (0 — выключено)
+  min_contrast: 15.0          # минимальная разница яркости объект/фон в окне (0-255); иначе «нет объекта»
+  window_start: 16            # точка: стартовый радиус локального окна, px (растёт в 1.5 раза)
+  snap_radius: 15.0           # клик мимо объекта: искать ближайший объект в радиусе, px
+  grow_tolerance: 12.0        # запасной путь: наращивание области от точки, допуск яркости
+  box_margin: 0.3             # кольцо фона вокруг рамки/ROI, доля размера
+  clip_to_region: true        # обрезать маску рамкой/ROI
+  min_area: 20
+  max_area_frac: 0.5          # больше этой доли кадра — скорее всего выбран фон
+  grabcut_iterations: 5
+  split:                      # экспериментально: разделять слипшиеся (только для точки)
+    enabled: false
+    peak_fraction: 0.8
+
+tracking:
+  # Ворота сопоставления: объект ищется не дальше max(max_displacement_px,
+  # gate_diameters × диаметр) от предсказанного положения, px за обработанный кадр.
+  max_displacement_px: 30.0
+  gate_diameters: 2.0
+  max_missed_frames: 2        # сколько кадров подряд объект может пропадать, не теряя ID
+  use_shape_similarity: true  # учитывать сходство площади и осей при сопоставлении
+  max_cost: 0.75              # выше — пара отвергается (0..1)
+  ambiguity_margin: 0.1       # второй кандидат ближе, чем на это, — сопоставление помечается ambiguous
+
+calibration:
+  # Не заполнять, пока калибровка не известна.
+  pixel_size_um: null
+  unit: um
+
+# Морфометрия и динамика считаются всегда, полным набором признаков:
+# список столбцов — docs/export_schema.md.
+
+output:
+  directory: results
+  save_csv: true
+  save_parquet: true
+  save_visualization: true    # overlay.mp4 и preview.png
+  save_frames: false          # PNG каждого кадра с наложением (frames/)
+  include_predicted: false    # добавлять строки с предсказанным положением на пропусках

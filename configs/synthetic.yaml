@@ -1,0 +1,8 @@
+seed: 42
+sequences: 3
+frames: 20
+width: 512
+height: 384
+fps: 5.0
+objects_per_frame: 18
+output_dir: data/synthetic
